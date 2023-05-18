@@ -5,6 +5,7 @@
 #define RREQ_PACKET 1
 #define RREP_PACKET 2
 #define RRER_PACKET 3
+#define BEAT_PACKET 4
 
 // Setup GPS Module
 #include<SoftwareSerial.h>
@@ -64,6 +65,10 @@ struct routingTable {
   uint8_t nextNode;
 };
 routingTable RoutingTable[MAX_NODES];
+long routelifeTime = 0;
+
+// Setup Counter For Connection Checking
+uint8_t connectionCounter = 0;
 
 // Sends Data Packets
 void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, double speed, double latitude, double longitude) {
@@ -107,7 +112,7 @@ void setup() {
 
 void loop() {
   // Transmitter Mode (Lasts Briefly)
-  if(RoutingTable[NODE_ID].isRouted == 1 && MCU.available() > 0) {
+         if(RoutingTable[NODE_ID].isRouted == 1 && millis() - routelifeTime < 100000 && MCU.available() > 0) {
     // Sends Data Packet
     GPS.encode(MCU.read());
     sendDataPacket(DATA_PACKET, NODE_ID, NODE_ID, GPS.speed.kmph(), GPS.location.lat(), GPS.location.lng());
@@ -115,40 +120,77 @@ void loop() {
     // Sends RREQ Packet
     sendAODVPacket(RREQ_PACKET, cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID);
     RoutingCache[cacheIndex] = {cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID};
-    cacheIndex++;  
+    cacheIndex++;
   }
 
   // Receiver Mode (Lasts For 10 Seconds)
-  long startTime = millis();
-  long elapsedTime = 0;
-  while(elapsedTime < 10000) {
+  long receivingTime = millis();
+  while(true) {
     int packetSize = LoRa.parsePacket();
     if(packetSize) {
       byte packetBuffer[255];
       LoRa.readBytes(packetBuffer, packetSize);
-      if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
+             if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
         // Forwards DATA Packet
         dataPacket DataPacket;
         memcpy(&DataPacket, packetBuffer, sizeof(DataPacket));
-        sendDataPacket(DATA_PACKET, NODE_ID, DataPacket.sourceNode, DataPacket.speed, DataPacket.latitude, DataPacket.longitude);
-      } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
+        sendDataPacket(DataPacket.packetType, NODE_ID, DataPacket.sourceNode, DataPacket.speed, DataPacket.latitude, DataPacket.longitude);
+      } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
         // Forwards RREQ Packet
         aodvPacket AODVPacket;
         memcpy(&AODVPacket, packetBuffer, sizeof(AODVPacket));
         sendAODVPacket(RREQ_PACKET, cacheIndex, AODVPacket.hopCount + 1, AODVPacket.nextNode, AODVPacket.sourceNode, NODE_ID);
         RoutingCache[cacheIndex] = {cacheIndex, AODVPacket.hopCount + 1, AODVPacket.nextNode, AODVPacket.sourceNode, NODE_ID};
         cacheIndex++;
-      } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[4] == NODE_ID) {
+      } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] != NODE_ID) {
         // Receives RREP Packet
-      } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[4] != NODE_ID) {
+        RoutingTable[packetBuffer[4]] = {true, RoutingCache[packetBuffer[1]].hopCount, RoutingCache[packetBuffer[1]].previousNode, RoutingCache[packetBuffer[1]].sourceNode, RoutingCache[packetBuffer[1]].nextNode};
+        routelifeTime = millis();
+      } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
         // Forwards RREP Packet
-      } else if(packetBuffer[0] == RRER_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[4] == NODE_ID) {
+        aodvPacket AODVPacket;
+        memcpy(&AODVPacket, packetBuffer, sizeof(AODVPacket));
+        sendAODVPacket(RREP_PACKET, RoutingCache[packetBuffer[1]].broadcastId, RoutingCache[packetBuffer[1]].hopCount - 1, RoutingCache[packetBuffer[1]].previousNode, RoutingCache[packetBuffer[1]].sourceNode, RoutingCache[packetBuffer[1]].nextNode);
+        RoutingTable[packetBuffer[4]] = {true, RoutingCache[packetBuffer[1]].hopCount - 1, RoutingCache[packetBuffer[1]].previousNode, RoutingCache[packetBuffer[1]].sourceNode, RoutingCache[packetBuffer[1]].nextNode};
+      } else if(packetBuffer[0] == RRER_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] != NODE_ID) {
         // Receives RRER Packet
-      } else if(packetBuffer[0] == RRER_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[4] != NODE_ID) {
+        RoutingTable[packetBuffer[4]].isRouted = false;
+        cacheIndex = 0;
+      } else if(packetBuffer[0] == RRER_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
         // Forwards RRER Packet
+        aodvPacket AODVPacket;
+        memcpy(&AODVPacket, packetBuffer, sizeof(AODVPacket));
+        sendAODVPacket(RRER_PACKET, RoutingTable[packetBuffer[1]].isRouted, RoutingTable[packetBuffer[1]].hopCount - 1, RoutingTable[packetBuffer[1]].previousNode, RoutingTable[packetBuffer[1]].sourceNode, RoutingTable[packetBuffer[1]].nextNode);
+        RoutingTable[packetBuffer[4]].isRouted = false;
+      } else if(packetBuffer[0] == BEAT_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] == NODE_ID) {
+        // Receives BEAT Packet
+        routelifeTime = millis();
+        cacheIndex = 0;
+      } else if(packetBuffer[0] == BEAT_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[4] != NODE_ID && RoutingTable[packetBuffer[4]].isRouted == 1 && RoutingTable[packetBuffer[4]].previousNode == packetBuffer[4]) {
+        // Forwards BEAT Packet
+        aodvPacket AODVPacket;
+        memcpy(&AODVPacket, packetBuffer, sizeof(AODVPacket));
+        sendAODVPacket(BEAT_PACKET, AODVPacket.broadcastId, AODVPacket.hopCount + 1, AODVPacket.previousNode, AODVPacket.sourceNode, AODVPacket.nextNode);
       }
     }
-    elapsedTime = millis() - startTime;
+    if(millis() - receivingTime > 10000) {
+      break;
+    } else {
+      continue;
+    }
+  }
+
+  // Checks Connection
+  if(millis() - routelifeTime > 100000) {
+    // Sends BEAT Packet
+    sendAODVPacket(BEAT_PACKET, cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID);
+    RoutingCache[cacheIndex] = {cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID};
+    cacheIndex++;
+    connectionCounter++;
+  }
+  if(connectionCounter > 3) {
+    RoutingTable[NODE_ID].isRouted = false;
+    cacheIndex = 0;
   }
 }
 
