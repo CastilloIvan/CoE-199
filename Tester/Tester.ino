@@ -134,7 +134,7 @@ void loop() {
   /*
   int packetSize = LoRa.parsePacket();
   if(packetSize) {
-    byte packetBuffer[256];
+    byte packetBuffer[255];
     LoRa.readBytes(packetBuffer, packetSize);
     dataPacket DataPacket;
     memcpy(&DataPacket, packetBuffer, sizeof(DataPacket));
