@@ -203,4 +203,15 @@ LoRa.write(packetBuffer, sizeof(packetBuffer));
 LoRa.endPacket();
 Serial.println("Data Packet Sent.");
 delay(5000);
+
+dataPacket DataPacket = {1, 2, 3, 1.7964400291, 14.6472606659, 121.0637359619};
+byte packetBuffer[255];
+memcpy(packetBuffer, &DataPacket, sizeof(DataPacket));
+for(int i = 0; i < 255; i++) {
+  printf("%x ", packetBuffer[i]);
+}
+double speed;
+memcpy(&speed, &packetBuffer[8], sizeof(double));
+printf("%f ", speed);
+return 0;
 */
