@@ -77,7 +77,7 @@ void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t source
   LoRa.endPacket();
 }
 
-// Sends RREQ Packets
+// Sends AODV Packets
 void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, uint8_t previousNode, uint8_t sourceNode, uint8_t nextNode) {
   aodvPacket AODVPacket = {packetType, broadcastId, hopCount, previousNode, sourceNode, nextNode};
   byte packetBuffer[50];
