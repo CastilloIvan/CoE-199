@@ -30,9 +30,9 @@ struct dataPacket {
   uint8_t packetType;
   uint8_t intermediateNode;
   uint8_t sourceNode;
-  double speed;
-  double latitude;
-  double longitude;
+  float speed;
+  float latitude;
+  float longitude;
 };
 
 // Setup AODV Packet Structure
@@ -65,15 +65,12 @@ struct routingTable {
   uint8_t nextNode;
 };
 routingTable RoutingTable[MAX_NODES];
-long routelifeTime = 0;
-
-// Setup Counter For Connection Checking
-uint8_t connectionCounter = 0;
+long lifeTime = 0;
 
 // Sends Data Packets
-void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, double speed, double latitude, double longitude) {
+void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude) {
   dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude};
-  byte packetBuffer[255];
+  byte packetBuffer[50];
   memcpy(packetBuffer, &DataPacket, sizeof(DataPacket));
   LoRa.beginPacket();
   LoRa.write(packetBuffer, sizeof(packetBuffer));
@@ -83,7 +80,7 @@ void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t source
 // Sends RREQ Packets
 void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, uint8_t previousNode, uint8_t sourceNode, uint8_t nextNode) {
   aodvPacket AODVPacket = {packetType, broadcastId, hopCount, previousNode, sourceNode, nextNode};
-  byte packetBuffer[255];
+  byte packetBuffer[50];
   memcpy(packetBuffer, &AODVPacket, sizeof(AODVPacket));
   LoRa.beginPacket();
   LoRa.write(packetBuffer, sizeof(packetBuffer));
@@ -96,11 +93,13 @@ void setup() {
   MCU.begin(9600);
 
   // Setup LoRa Module
+  /*
   LoRa.setPins(SS, RESET, DIO0);
   LoRa.setTxPower(TX_POWER);
   LoRa.setSpreadingFactor(SPREADING_FACTOR);
   LoRa.setCodingRate4(CODING_RATE);
   LoRa.setSignalBandwidth(SIGNAL_BANDWIDTH);
+  */
 
   // Tests Setup
   Serial.println("Starting Node " + String(NODE_ID));
@@ -112,7 +111,7 @@ void setup() {
 
 void loop() {
   // Transmitter Mode (Lasts Briefly)
-         if(RoutingTable[NODE_ID].isRouted == 1 && millis() - routelifeTime < 100000 && MCU.available() > 0) {
+         if(RoutingTable[NODE_ID].isRouted == 1 && millis() - lifeTime < 100000 && MCU.available() > 0) {
     // Sends Data Packet
     GPS.encode(MCU.read());
     sendDataPacket(DATA_PACKET, NODE_ID, NODE_ID, GPS.speed.kmph(), GPS.location.lat(), GPS.location.lng());
@@ -145,7 +144,7 @@ void loop() {
       } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] != NODE_ID) {
         // Receives RREP Packet
         RoutingTable[packetBuffer[4]] = {true, RoutingCache[packetBuffer[1]].hopCount, RoutingCache[packetBuffer[1]].previousNode, RoutingCache[packetBuffer[1]].sourceNode, RoutingCache[packetBuffer[1]].nextNode};
-        routelifeTime = millis();
+        lifeTime = millis();
       } else if(packetBuffer[0] == RREP_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
         // Forwards RREP Packet
         aodvPacket AODVPacket;
@@ -164,7 +163,7 @@ void loop() {
         RoutingTable[packetBuffer[4]].isRouted = false;
       } else if(packetBuffer[0] == BEAT_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] == NODE_ID) {
         // Receives BEAT Packet
-        routelifeTime = millis();
+        lifeTime = millis();
         cacheIndex = 0;
       } else if(packetBuffer[0] == BEAT_PACKET && packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[4] != NODE_ID && RoutingTable[packetBuffer[4]].isRouted == 1 && RoutingTable[packetBuffer[4]].previousNode == packetBuffer[4]) {
         // Forwards BEAT Packet
@@ -178,19 +177,6 @@ void loop() {
     } else {
       continue;
     }
-  }
-
-  // Checks Connection
-  if(millis() - routelifeTime > 100000) {
-    // Sends BEAT Packet
-    sendAODVPacket(BEAT_PACKET, cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID);
-    RoutingCache[cacheIndex] = {cacheIndex, 0, NODE_ID, NODE_ID, NODE_ID};
-    cacheIndex++;
-    connectionCounter++;
-  }
-  if(connectionCounter > 3) {
-    RoutingTable[NODE_ID].isRouted = false;
-    cacheIndex = 0;
   }
 }
 
