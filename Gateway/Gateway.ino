@@ -83,6 +83,36 @@ void loop() {
   if(packetSize) {
     byte packetBuffer[50];
     LoRa.readBytes(packetBuffer, packetSize);
+             if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
+        // Receives DATA Packet
+        float speed;
+        memcpy(&speed, &packetBuffer[3], sizeof(speed));
+        float latitude;
+        memcpy(&latitude, &packetBuffer[7], sizeof(latitude));
+        float longitude;
+        memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
+        Serial.println("Received Data Packet:");
+        Serial.println("Packet Type:        " + String(packetBuffer[0]));
+        Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
+        Serial.println("Source Node:        " + String(packetBuffer[2]));    
+        Serial.println("Speed:              " + String(speed, 10));
+        Serial.println("Latitude:           " + String(latitude, 10));
+        Serial.println("Longitude:          " + String(longitude, 10));
+        Serial.println("RSSI:               " + String(LoRa.packetRssi()));
+      } else if(packetBuffer[0] == RREQ_PACKET && 0 < packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
+        // Receives RREQ Packet and Sends RREP Packet
+        RoutingTable[packetBuffer[4]] = {true, packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID};
+        sendAODVPacket(RREP_PACKET, packetBuffer[1], packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID);
+        Serial.println("Received AODV Packet:");
+        Serial.println("Packet Type:        " + String(packetBuffer[0]));
+        Serial.println("Broadcast Id:       " + String(packetBuffer[1]));
+        Serial.println("Hop Count:          " + String(packetBuffer[2]));    
+        Serial.println("Previous Node:      " + String(packetBuffer[3]));
+        Serial.println("Source Node:        " + String(packetBuffer[4]));
+        Serial.println("Next Node:          " + String(packetBuffer[5]));
+        Serial.println("RSSI:               " + String(LoRa.packetRssi()));
+      }
+    /*
     Serial.println("Packet Type:        " + String(packetBuffer[0]));
     Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
     Serial.println("Source Node:        " + String(packetBuffer[2]));
@@ -96,5 +126,6 @@ void loop() {
     Serial.println("Latitude:           " + String(latitude, 10));
     Serial.println("Longitude:          " + String(longitude, 10));
     Serial.println("RSSI:               " + String(LoRa.packetRssi()));
+    */
   }
 }
