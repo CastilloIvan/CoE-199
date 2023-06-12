@@ -25,7 +25,7 @@ TinyGPSPlus GPS;
 #define SIGNAL_BANDWIDTH  125E3
 #define CARRIER_FREQUENCY 433E6
 
-// Setup Data Packet Structure
+// Setup DATA Packet Structure
 struct dataPacket {
   uint8_t packetType;
   uint8_t intermediateNode;
@@ -66,7 +66,7 @@ struct routingTable {
 };
 routingTable RoutingTable[MAX_NODES];
 
-// Sends Data Packets
+// Sends DATA Packets
 void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude) {
   dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude};
   byte packetBuffer[50];
@@ -111,7 +111,7 @@ void setup() {
 void loop() {
   // Transmitter Mode (Lasts Briefly)
          if(RoutingTable[NODE_ID].isRouted == 1 && MCU.available() > 0) {
-    // Sends Data Packet
+    // Sends DATA Packet
     GPS.encode(MCU.read());
     sendDataPacket(DATA_PACKET, NODE_ID, NODE_ID, GPS.speed.kmph(), GPS.location.lat(), GPS.location.lng());
     RoutingTable[NODE_ID].dackCounter += 1;
@@ -144,6 +144,9 @@ void loop() {
         sendAODVPacket(packetBuffer[0], cacheIndex, packetBuffer[2] + 1, packetBuffer[5], packetBuffer[4], NODE_ID);
         RoutingCache[cacheIndex] = {cacheIndex, packetBuffer[2] + 1, packetBuffer[5], packetBuffer[4], NODE_ID};
         cacheIndex++;
+        if(cacheIndex >= 255) {
+          cacheIndex = 0;
+        }
       } else if(packetBuffer[0] == RREP_PACKET && 0 < packetBuffer[1] < 255 && 0 < packetBuffer[2] < MAX_NODES && packetBuffer[3] == NODE_ID && packetBuffer[4] == NODE_ID && packetBuffer[5] != NODE_ID) {
         // Receives RREP Packet
         RoutingTable[packetBuffer[4]] = {true, 0, RoutingCache[packetBuffer[1]].previousNode, RoutingCache[packetBuffer[1]].sourceNode, RoutingCache[packetBuffer[1]].nextNode};
@@ -168,8 +171,9 @@ void loop() {
     } else {
       continue;
     }
-    if(cacheIndex >= 255) {
-      cacheIndex = 0;
-    }
+  }
+
+  if(RoutingTable[NODE_ID].dackCounter >= 3) {
+    RoutingTable[NODE_ID].isRouted = 0;
   }
 }
