@@ -89,9 +89,9 @@ void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, u
 }
 
 // For Testing
-uint8_t Psent = 0;
-uint8_t Preceived = 0;
-float PDR = 0;
+uint8_t Psent[MAX_NODES];
+uint8_t Preceived[MAX_NODES];
+float PDR[MAX_NODES];
 float Trttarr[249];
 uint8_t TrttarrIndex = 0;
 float Trtt = 0;
@@ -133,9 +133,9 @@ void loop() {
       float longitude;
       memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
       sendDataPacket(DACK_PACKET, packetBuffer[1], packetBuffer[2], speed, latitude, longitude, packetBuffer[15]);
-      Preceived += 1;
-      Psent = packetBuffer[15];
-      PDR = Preceived / Psent;
+      Preceived[packetBuffer[2]] += 1;
+      Psent[packetBuffer[2]] = packetBuffer[15];
+      PDR[packetBuffer[2]] = Preceived[packetBuffer[2]] / Psent[packetBuffer[2]];
       Serial.println("Received DATA Packet:");
       Serial.println("Packet Type:        " + String(packetBuffer[0]));
       Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
@@ -143,9 +143,9 @@ void loop() {
       Serial.println("Speed:              " + String(speed, 10));
       Serial.println("Latitude:           " + String(latitude, 10));
       Serial.println("Longitude:          " + String(longitude, 10));
-      Serial.println("Packets Received:   " + String(Preceived));
-      Serial.println("Packets Sent:       " + String(Psent));
-      Serial.println("PDR:                " + String(PDR));      
+      Serial.println("Packets Received:   " + String(Preceived[packetBuffer[2]]));
+      Serial.println("Packets Sent:       " + String(Psent[packetBuffer[2]]));
+      Serial.println("PDR:                " + String(PDR[packetBuffer[2]]));      
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
       // Receives RREQ Packet and Sends RREP Packet
