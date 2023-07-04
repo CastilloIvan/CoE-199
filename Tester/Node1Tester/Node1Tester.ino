@@ -90,8 +90,9 @@ void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, u
 
 // For Testing
 uint8_t Psent = 0;
-float Trttarr[249];
-uint8_t TrttarrIndex = 0;
+float Tsent = 0;
+float Treceived = 0;
+float Trttarr[250];
 float Trtt = 0;
 
 void setup() {

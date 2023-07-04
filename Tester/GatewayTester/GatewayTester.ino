@@ -102,6 +102,7 @@ void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, u
   LoRa.endPacket();
 }
 
+// Initializes WiFi
 void InitWiFi() {
   Serial.println("Connecting to AP ...");
   WiFi.begin(WIFI_AP, WIFI_PASSWORD);
@@ -112,6 +113,7 @@ void InitWiFi() {
   Serial.println("Connected to AP");
 }
 
+// Reconnects to ThingsBoard
 void reconnect() {
   while(!tb.connected()) {
     status = WiFi.status();
@@ -134,31 +136,30 @@ void reconnect() {
   }
 }
 
-void getAndSendData(uint8_t node_id, float speed, float latitude, float longitude, float PDR) {
+// Sends Data to ThingsBoard
+void sendData(uint8_t node_id, float speed, float latitude, float longitude, float pdr) {
          if(node_id == 1) {
     tb.sendTelemetryFloat("N1 Speed", speed);
     tb.sendTelemetryFloat("N1 Latitude", latitude);
     tb.sendTelemetryFloat("N1 Longitude", longitude);
-    tb.sendTelemetryFloat("N1 PDR", PDR);
+    tb.sendTelemetryFloat("N1 PDR", pdr);
   } else if(node_id == 2) {
     tb.sendTelemetryFloat("N2 Speed", speed);
     tb.sendTelemetryFloat("N2 Latitude", latitude);
     tb.sendTelemetryFloat("N2 Longitude", longitude);
-    tb.sendTelemetryFloat("N2 PDR", PDR);
+    tb.sendTelemetryFloat("N2 PDR", pdr);
   } else if(node_id == 3) {
     tb.sendTelemetryFloat("N3 Speed", speed);
     tb.sendTelemetryFloat("N3 Latitude", latitude);
     tb.sendTelemetryFloat("N3 Longitude", longitude);
-    tb.sendTelemetryFloat("N3 PDR", PDR);
+    tb.sendTelemetryFloat("N3 PDR", pdr);
+  }
 }
 
 // For Testing
 uint8_t Psent[MAX_NODES];
 uint8_t Preceived[MAX_NODES];
 float PDR[MAX_NODES];
-float Trttarr[249];
-uint8_t TrttarrIndex = 0;
-float Trtt = 0;
 
 void setup() {
   // Setup GPS Module
@@ -208,7 +209,7 @@ void loop() {
       Preceived[packetBuffer[2]] += 1;
       Psent[packetBuffer[2]] = packetBuffer[15];
       PDR[packetBuffer[2]] = Preceived[packetBuffer[2]] / Psent[packetBuffer[2]];
-      getAndSendData(packetBuffer[2], speed, latitude, longitude, PDR[packetBuffer[2]]);
+      sendData(packetBuffer[2], speed, latitude, longitude, PDR[packetBuffer[2]]);
       Serial.println("Received DATA Packet:");
       Serial.println("Packet Type:        " + String(packetBuffer[0]));
       Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
