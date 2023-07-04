@@ -25,6 +25,20 @@
 #define SIGNAL_BANDWIDTH  125E3
 #define CARRIER_FREQUENCY 433E6
 
+// Setup Wifi Module
+#include <WiFi.h>
+#define WIFI_AP       "GTE 3RD FLR"
+#define WIFI_PASSWORD "gte646464"
+#define TOKEN         "OBE_GATEWAY_TOKEN"
+WiFiClient wifiClient;
+int status = WL_IDLE_STATUS;
+unsigned long lastSend;
+
+// Setup ThingsBoard Information
+#include <ThingsBoard.h>
+char thingsboardServer[] = "thingsboard.cloud";
+ThingsBoard tb(wifiClient);
+
 // Setup DATA Packet Structure
 struct dataPacket {
   uint8_t packetType;
@@ -88,6 +102,56 @@ void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, u
   LoRa.endPacket();
 }
 
+void InitWiFi() {
+  Serial.println("Connecting to AP ...");
+  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to AP");
+}
+
+void reconnect() {
+  while(!tb.connected()) {
+    status = WiFi.status();
+    if(status != WL_CONNECTED) {
+      WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+      while(WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+      }
+      Serial.println("Connected to AP");
+    }
+    Serial.print("Connecting to ThingsBoard node ...");
+    if(tb.connect(thingsboardServer, TOKEN)) {
+      Serial.println( "[DONE]" );
+    } else {
+      Serial.print( "[FAILED]" );
+      Serial.println( " : retrying in 5 seconds]" );
+      delay( 5000 );
+    }
+  }
+}
+
+void getAndSendData(uint8_t node_id, float speed, float latitude, float longitude, float PDR) {
+         if(node_id == 1) {
+    tb.sendTelemetryFloat("N1 Speed", speed);
+    tb.sendTelemetryFloat("N1 Latitude", latitude);
+    tb.sendTelemetryFloat("N1 Longitude", longitude);
+    tb.sendTelemetryFloat("N1 PDR", PDR);
+  } else if(node_id == 2) {
+    tb.sendTelemetryFloat("N2 Speed", speed);
+    tb.sendTelemetryFloat("N2 Latitude", latitude);
+    tb.sendTelemetryFloat("N2 Longitude", longitude);
+    tb.sendTelemetryFloat("N2 PDR", PDR);
+  } else if(node_id == 3) {
+    tb.sendTelemetryFloat("N3 Speed", speed);
+    tb.sendTelemetryFloat("N3 Latitude", latitude);
+    tb.sendTelemetryFloat("N3 Longitude", longitude);
+    tb.sendTelemetryFloat("N3 PDR", PDR);
+}
+
 // For Testing
 uint8_t Psent[MAX_NODES];
 uint8_t Preceived[MAX_NODES];
@@ -110,6 +174,12 @@ void setup() {
   LoRa.setSignalBandwidth(SIGNAL_BANDWIDTH);
   */
 
+  // Setup WiFi Module
+  InitWiFi();
+
+  // Setup ThingsBoard Information
+  if(!tb.connected()) { reconnect(); }
+
   // Tests Setup
   Serial.println("Starting Node " + String(NODE_ID) + ".");
   while(!LoRa.begin(433E6)) {
@@ -120,6 +190,8 @@ void setup() {
 }
 
 void loop() {
+  if(!tb.connected()) { reconnect(); }
+
   int packetSize = LoRa.parsePacket();
   if(packetSize) {
     byte packetBuffer[50];
@@ -136,6 +208,7 @@ void loop() {
       Preceived[packetBuffer[2]] += 1;
       Psent[packetBuffer[2]] = packetBuffer[15];
       PDR[packetBuffer[2]] = Preceived[packetBuffer[2]] / Psent[packetBuffer[2]];
+      getAndSendData(packetBuffer[2], speed, latitude, longitude, PDR[packetBuffer[2]]);
       Serial.println("Received DATA Packet:");
       Serial.println("Packet Type:        " + String(packetBuffer[0]));
       Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
@@ -145,7 +218,7 @@ void loop() {
       Serial.println("Longitude:          " + String(longitude, 10));
       Serial.println("Packets Received:   " + String(Preceived[packetBuffer[2]]));
       Serial.println("Packets Sent:       " + String(Psent[packetBuffer[2]]));
-      Serial.println("PDR:                " + String(PDR[packetBuffer[2]]));      
+      Serial.println("PDR:                " + String(PDR[packetBuffer[2]]));
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
       // Receives RREQ Packet and Sends RREP Packet
@@ -161,4 +234,6 @@ void loop() {
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     }
   }
+
+  tb.loop();
 }
