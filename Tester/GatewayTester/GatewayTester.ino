@@ -16,9 +16,12 @@
 // Setup LoRa Module
 #include<SPI.h>
 #include<LoRa.h>
-#define SS    10
-#define RESET 9
-#define DIO0  2
+#define SCK   5
+#define MISO  19
+#define MOSI  27
+#define SS    18
+#define RESET 14
+#define DIO0  26
 #define TX_POWER          11
 #define SPREADING_FACTOR  9
 #define CODING_RATE       5
@@ -117,15 +120,7 @@ void InitWiFi() {
 // Reconnects to ThingsBoard
 void reconnect() {
   while(!tb.connected()) {
-    status = WiFi.status();
-    if(status != WL_CONNECTED) {
-      WiFi.begin(WIFI_AP, WIFI_PASSWORD);
-      while(WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-      }
-      Serial.println("Connected to AP");
-    }
+    if(WiFi.status() != WL_CONNECTED) { InitWiFi(); }
     Serial.print("Connecting to ThingsBoard node ...");
     if(tb.connect(thingsboardServer, TOKEN)) {
       Serial.println( "[DONE]" );
@@ -175,6 +170,8 @@ void setup() {
   LoRa.setCodingRate4(CODING_RATE);
   LoRa.setSignalBandwidth(SIGNAL_BANDWIDTH);
   */
+  SPI.begin(SCK, MISO, MOSI, SS);
+  LoRa.setPins(SS, RESET, DIO0);
 
   // Setup WiFi Module
   InitWiFi();
