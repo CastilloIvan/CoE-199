@@ -34,6 +34,7 @@ struct dataPacket {
   float latitude;
   float longitude;
   uint8_t Psent;
+  float Trtt;
 };
 
 // Setup AODV Packet Structure
@@ -69,8 +70,8 @@ routingTable RoutingTable[MAX_NODES];
 uint8_t dataCounter = 0;
 
 // Sends DATA Packets
-void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude, uint8_t Psent) {
-  dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude, Psent};
+void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude, uint8_t Psent, float Trtt) {
+  dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude, Psent, Trtt};
   byte packetBuffer[50];
   memcpy(packetBuffer, &DataPacket, sizeof(DataPacket));
   LoRa.beginPacket();
@@ -92,7 +93,8 @@ void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, u
 uint8_t Psent = 0;
 float Tsent = 0;
 float Treceived = 0;
-float Trttarr[250];
+float TrttTotal = 0;
+uint8_t TrttCount = 0;
 float Trtt = 0;
 
 void setup() {
@@ -122,10 +124,11 @@ void loop() {
   // Transmitter Mode (Lasts Briefly)
          if(RoutingTable[NODE_ID].isRouted == 1 && MCU.available() > 0) {
     // Sends DATA Packet
-    Psent += 1;
     GPS.encode(MCU.read());
-    sendDataPacket(DATA_PACKET, NODE_ID, NODE_ID, GPS.speed.kmph(), GPS.location.lat(), GPS.location.lng(), Psent);
+    sendDataPacket(DATA_PACKET, NODE_ID, NODE_ID, GPS.speed.kmph(), GPS.location.lat(), GPS.location.lng(), Psent, Trtt);
     dataCounter += 1;
+    Psent += 1;
+    Tsent = millis();
     Serial.println("Sent DATA Packet.");
   } else if(RoutingTable[NODE_ID].isRouted == 0) {
     // Sends RREQ Packet
@@ -143,7 +146,7 @@ void loop() {
     if(packetSize) {
       byte packetBuffer[50];
       LoRa.readBytes(packetBuffer, packetSize);
-             if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
+             if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
         // Forwards DATA Packet
         float speed;
         memcpy(&speed, &packetBuffer[3], sizeof(speed));
@@ -151,8 +154,9 @@ void loop() {
         memcpy(&latitude, &packetBuffer[7], sizeof(latitude));
         float longitude;
         memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
-        sendDataPacket(packetBuffer[0], NODE_ID, packetBuffer[2], speed, latitude, longitude, packetBuffer[15]);
-        sendDataPacket(DACK_PACKET, packetBuffer[1], packetBuffer[2], speed, latitude, longitude, packetBuffer[15]);
+        float trtt;
+        memcpy(&trtt, &packetBuffer[16], sizeof(trtt));
+        sendDataPacket(packetBuffer[0], NODE_ID, packetBuffer[2], speed, latitude, longitude, packetBuffer[15], trtt);
       } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
         // Forwards RREQ Packet
         sendAODVPacket(packetBuffer[0], cacheIndex, packetBuffer[2] + 1, packetBuffer[5], packetBuffer[4], NODE_ID);
@@ -173,9 +177,24 @@ void loop() {
         // Forwards RRER Packet
         sendAODVPacket(packetBuffer[0], RoutingTable[packetBuffer[4]].isRouted, RoutingTable[packetBuffer[4]].hopCount, RoutingTable[packetBuffer[4]].previousNode, RoutingTable[packetBuffer[4]].sourceNode, RoutingTable[packetBuffer[4]].nextNode);
         RoutingTable[packetBuffer[4]].isRouted = 0;
-      } else if(packetBuffer[0] == DACK_PACKET && packetBuffer[1] == NODE_ID && packetBuffer[2] == NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
+      } else if(packetBuffer[0] == DACK_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] == NODE_ID && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode != packetBuffer[1]) {
         // Receives DACK Packet
         dataCounter = 0;
+        Treceived = millis();
+        TrttTotal += Treceived - Tsent;
+        TrttCount += 1;
+        Trtt = TrttTotal / TrttCount;
+      } else if(packetBuffer[0] == DACK_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode != packetBuffer[1]) {
+        // Forwards DACK Packet
+        float speed;
+        memcpy(&speed, &packetBuffer[3], sizeof(speed));
+        float latitude;
+        memcpy(&latitude, &packetBuffer[7], sizeof(latitude));
+        float longitude;
+        memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
+        float trtt;
+        memcpy(&trtt, &packetBuffer[16], sizeof(trtt));
+        sendDataPacket(packetBuffer[0], NODE_ID, packetBuffer[2], speed, latitude, longitude, packetBuffer[15], trtt);
       }
     }
     if(millis() - receivingTime > 10000) { break; } else { continue; }

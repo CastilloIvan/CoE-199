@@ -48,6 +48,7 @@ struct dataPacket {
   float latitude;
   float longitude;
   uint8_t Psent;
+  float Trtt;
 };
 
 // Setup AODV Packet Structure
@@ -74,7 +75,7 @@ uint8_t cacheIndex = 0;
 // Setup Routing Table Structure
 struct routingTable {
   uint8_t isRouted;
-  uint8_t dackCounter;
+  uint8_t hopCount;
   uint8_t previousNode;
   uint8_t sourceNode;
   uint8_t nextNode;
@@ -83,8 +84,8 @@ routingTable RoutingTable[MAX_NODES];
 uint8_t dataCounter = 0;
 
 // Sends DATA Packets
-void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude, uint8_t Psent) {
-  dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude, Psent};
+void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude, uint8_t Psent, float Trtt) {
+  dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude, Psent, Trtt};
   byte packetBuffer[50];
   memcpy(packetBuffer, &DataPacket, sizeof(DataPacket));
   LoRa.beginPacket();
@@ -157,8 +158,8 @@ void sendData(uint8_t node_id, float speed, float latitude, float longitude, flo
 }
 
 // For Testing
-uint8_t Psent[MAX_NODES];
 uint8_t Preceived[MAX_NODES];
+uint8_t Psent[MAX_NODES];
 float PDR[MAX_NODES];
 
 void setup() {
@@ -205,7 +206,9 @@ void loop() {
       memcpy(&latitude, &packetBuffer[7], sizeof(latitude));
       float longitude;
       memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
-      sendDataPacket(DACK_PACKET, packetBuffer[1], packetBuffer[2], speed, latitude, longitude, packetBuffer[15]);
+      float trtt;
+      memcpy(&trtt, &packetBuffer[16], sizeof(trtt));
+      sendDataPacket(DACK_PACKET, NODE_ID, packetBuffer[2], speed, latitude, longitude, packetBuffer[15], trtt);
       Preceived[packetBuffer[2]] += 1;
       Psent[packetBuffer[2]] = packetBuffer[15];
       PDR[packetBuffer[2]] = Preceived[packetBuffer[2]] / Psent[packetBuffer[2]];
@@ -223,8 +226,8 @@ void loop() {
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
       // Receives RREQ Packet and Sends RREP Packet
-      RoutingTable[packetBuffer[4]] = {1, packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID};
       sendAODVPacket(RREP_PACKET, packetBuffer[1], packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID);
+      RoutingTable[packetBuffer[4]] = {1, packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID};
       Serial.println("Received RREQ Packet:");
       Serial.println("Packet Type:        " + String(packetBuffer[0]));
       Serial.println("Broadcast Id:       " + String(packetBuffer[1]));
