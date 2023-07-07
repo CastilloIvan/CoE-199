@@ -50,9 +50,12 @@ struct dataPacket {
   float speed;
   float latitude;
   float longitude;
-  uint8_t Psent;
-  float Trtt;
+  uint8_t psent;
+  float rtt;
 };
+float SPEED = 0;
+float LATITUDE = 0;
+float LONGITUDE = 0;
 
 // Setup AODV Packet Structure
 struct aodvPacket {
@@ -72,8 +75,8 @@ struct routingCache {
   uint8_t sourceNode;
   uint8_t nextNode;
 };
-routingCache RoutingCache[255];
-uint8_t cacheIndex = 0;
+routingCache ROUTINGCACHE[255];
+uint8_t CACHEINDEX = 0;
 
 // Setup Routing Table Structure
 struct routingTable {
@@ -83,26 +86,26 @@ struct routingTable {
   uint8_t sourceNode;
   uint8_t nextNode;
 };
-routingTable RoutingTable[MAX_NODES];
-uint8_t dataCounter = 0;
+routingTable ROUTINGTABLE[MAX_NODES];
+uint8_t DATACOUNTER = 0;
 
 // Sends DATA Packets
-void sendDataPacket(uint8_t packetType, uint8_t intermediateNode, uint8_t sourceNode, float speed, float latitude, float longitude, uint8_t Psent, float Trtt) {
-  dataPacket DataPacket = {packetType, intermediateNode, sourceNode, speed, latitude, longitude, Psent, Trtt};
-  byte packetBuffer[50];
-  memcpy(packetBuffer, &DataPacket, sizeof(DataPacket));
+void SendDATAPacket(uint8_t PacketType, uint8_t IntermediateNode, uint8_t SourceNode, float Speed, float Latitude, float Longitude, uint8_t Psent, float Rtt) {
+  dataPacket DATAPacket = {PacketType, IntermediateNode, SourceNode, Speed, Latitude, Longitude, Psent, Rtt};
+  byte PacketBuffer[50];
+  memcpy(PacketBuffer, &DATAPacket, sizeof(DATAPacket));
   LoRa.beginPacket();
-  LoRa.write(packetBuffer, sizeof(packetBuffer));
+  LoRa.write(PacketBuffer, sizeof(PacketBuffer));
   LoRa.endPacket();
 }
 
 // Sends AODV Packets
-void sendAODVPacket(uint8_t packetType, uint8_t broadcastId, uint8_t hopCount, uint8_t previousNode, uint8_t sourceNode, uint8_t nextNode) {
-  aodvPacket AODVPacket = {packetType, broadcastId, hopCount, previousNode, sourceNode, nextNode};
-  byte packetBuffer[50];
-  memcpy(packetBuffer, &AODVPacket, sizeof(AODVPacket));
+void SendAODVPacket(uint8_t PacketType, uint8_t BroadcastId, uint8_t HopCount, uint8_t PreviousNode, uint8_t SourceNode, uint8_t NextNode) {
+  aodvPacket AODVPacket = {PacketType, BroadcastId, HopCount, PreviousNode, SourceNode, NextNode};
+  byte PacketBuffer[50];
+  memcpy(PacketBuffer, &AODVPacket, sizeof(AODVPacket));
   LoRa.beginPacket();
-  LoRa.write(packetBuffer, sizeof(packetBuffer));
+  LoRa.write(PacketBuffer, sizeof(PacketBuffer));
   LoRa.endPacket();
 }
 
@@ -118,7 +121,7 @@ void InitWiFi() {
 }
 
 // Reconnects to ThingsBoard
-void reconnect() {
+void Reconnect() {
   while(!tb.connected()) {
     if(WiFi.status() != WL_CONNECTED) { InitWiFi(); }
     Serial.print("Connecting to ThingsBoard node ...");
@@ -132,29 +135,29 @@ void reconnect() {
   }
 }
 
-// Sends Data to ThingsBoard
-void sendData(uint8_t node_id, float speed, float latitude, float longitude, float pdr) {
-         if(node_id == 1) {
-    tb.sendTelemetryFloat("N1 Speed", speed);
-    tb.sendTelemetryFloat("N1 Latitude", latitude);
-    tb.sendTelemetryFloat("N1 Longitude", longitude);
-    tb.sendTelemetryFloat("N1 PDR", pdr);
-  } else if(node_id == 2) {
-    tb.sendTelemetryFloat("N2 Speed", speed);
-    tb.sendTelemetryFloat("N2 Latitude", latitude);
-    tb.sendTelemetryFloat("N2 Longitude", longitude);
-    tb.sendTelemetryFloat("N2 PDR", pdr);
-  } else if(node_id == 3) {
-    tb.sendTelemetryFloat("N3 Speed", speed);
-    tb.sendTelemetryFloat("N3 Latitude", latitude);
-    tb.sendTelemetryFloat("N3 Longitude", longitude);
-    tb.sendTelemetryFloat("N3 PDR", pdr);
+// Uploads Data to ThingsBoard
+void UploadData(uint8_t Node_Id, float Speed, float Latitude, float Longitude, float Pdr) {
+         if(Node_Id == 1) {
+    tb.sendTelemetryFloat("N1 Speed", Speed);
+    tb.sendTelemetryFloat("N1 Latitude", Latitude);
+    tb.sendTelemetryFloat("N1 Longitude", Longitude);
+    tb.sendTelemetryFloat("N1 PDR", Pdr);
+  } else if(Node_Id == 2) {
+    tb.sendTelemetryFloat("N2 Speed", Speed);
+    tb.sendTelemetryFloat("N2 Latitude", Latitude);
+    tb.sendTelemetryFloat("N2 Longitude", Longitude);
+    tb.sendTelemetryFloat("N2 PDR", Pdr);
+  } else if(Node_Id == 3) {
+    tb.sendTelemetryFloat("N3 Speed", Speed);
+    tb.sendTelemetryFloat("N3 Latitude", Latitude);
+    tb.sendTelemetryFloat("N3 Longitude", Longitude);
+    tb.sendTelemetryFloat("N3 PDR", Pdr);
   }
 }
 
 // For Testing
-uint8_t Preceived[MAX_NODES];
-uint8_t Psent[MAX_NODES];
+uint8_t PRECEIVED[MAX_NODES];
+uint8_t PSENT[MAX_NODES];
 float PDR[MAX_NODES];
 
 void setup() {
@@ -177,7 +180,7 @@ void setup() {
   InitWiFi();
 
   // Setup ThingsBoard Information
-  if(!tb.connected()) { reconnect(); }
+  if(!tb.connected()) { Reconnect(); }
 
   // Tests Setup
   Serial.println("Starting Node " + String(NODE_ID) + ".");
@@ -189,49 +192,49 @@ void setup() {
 }
 
 void loop() {
-  if(!tb.connected()) { reconnect(); }
+  if(!tb.connected()) { Reconnect(); }
 
-  int packetSize = LoRa.parsePacket();
-  if(packetSize) {
-    byte packetBuffer[50];
-    LoRa.readBytes(packetBuffer, packetSize);
-           if(packetBuffer[0] == DATA_PACKET && packetBuffer[1] != NODE_ID && packetBuffer[2] != NODE_ID  && RoutingTable[packetBuffer[2]].isRouted == 1 && RoutingTable[packetBuffer[2]].previousNode == packetBuffer[1]) {
+  int PACKETSIZE = LoRa.parsePacket();
+  if(PACKETSIZE) {
+    byte PACKETBUFFER[50];
+    LoRa.readBytes(PACKETBUFFER, PACKETSIZE);
+           if(PACKETBUFFER[0] == DATA_PACKET && PACKETBUFFER[1] != NODE_ID && PACKETBUFFER[2] != NODE_ID  && ROUTINGTABLE[PACKETBUFFER[2]].isRouted == 1 && ROUTINGTABLE[PACKETBUFFER[2]].previousNode == PACKETBUFFER[1]) {
       // Receives DATA Packet
       float speed;
-      memcpy(&speed, &packetBuffer[3], sizeof(speed));
+      memcpy(&speed, &PACKETBUFFER[3], sizeof(speed));
       float latitude;
-      memcpy(&latitude, &packetBuffer[7], sizeof(latitude));
+      memcpy(&latitude, &PACKETBUFFER[7], sizeof(latitude));
       float longitude;
-      memcpy(&longitude, &packetBuffer[11], sizeof(longitude));
-      float trtt;
-      memcpy(&trtt, &packetBuffer[16], sizeof(trtt));
-      sendDataPacket(DACK_PACKET, NODE_ID, packetBuffer[2], speed, latitude, longitude, packetBuffer[15], trtt);
-      Preceived[packetBuffer[2]] += 1;
-      Psent[packetBuffer[2]] = packetBuffer[15];
-      PDR[packetBuffer[2]] = Preceived[packetBuffer[2]] / Psent[packetBuffer[2]];
-      sendData(packetBuffer[2], speed, latitude, longitude, PDR[packetBuffer[2]]);
+      memcpy(&longitude, &PACKETBUFFER[11], sizeof(longitude));
+      float rtt;
+      memcpy(&rtt, &PACKETBUFFER[16], sizeof(rtt));
+      SendDATAPacket(DACK_PACKET, NODE_ID, PACKETBUFFER[2], speed, latitude, longitude, PACKETBUFFER[15], rtt);
+      PRECEIVED[PACKETBUFFER[2]] += 1;
+      PSENT[PACKETBUFFER[2]] = PACKETBUFFER[15];
+      PDR[PACKETBUFFER[2]] = PRECEIVED[PACKETBUFFER[2]] / PSENT[PACKETBUFFER[2]];
+      UploadData(PACKETBUFFER[2], speed, latitude, longitude, PDR[PACKETBUFFER[2]]);
       Serial.println("Received DATA Packet:");
-      Serial.println("Packet Type:        " + String(packetBuffer[0]));
-      Serial.println("Intermediate Node:  " + String(packetBuffer[1]));
-      Serial.println("Source Node:        " + String(packetBuffer[2]));    
+      Serial.println("Packet Type:        " + String(PACKETBUFFER[0]));
+      Serial.println("Intermediate Node:  " + String(PACKETBUFFER[1]));
+      Serial.println("Source Node:        " + String(PACKETBUFFER[2]));    
       Serial.println("Speed:              " + String(speed, 10));
       Serial.println("Latitude:           " + String(latitude, 10));
       Serial.println("Longitude:          " + String(longitude, 10));
-      Serial.println("Packets Received:   " + String(Preceived[packetBuffer[2]]));
-      Serial.println("Packets Sent:       " + String(Psent[packetBuffer[2]]));
-      Serial.println("PDR:                " + String(PDR[packetBuffer[2]]));
+      Serial.println("Packets Received:   " + String(PRECEIVED[PACKETBUFFER[2]]));
+      Serial.println("Packets Sent:       " + String(PSENT[PACKETBUFFER[2]]));
+      Serial.println("PDR:                " + String(PDR[PACKETBUFFER[2]]));
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
-    } else if(packetBuffer[0] == RREQ_PACKET && packetBuffer[1] < 255 && packetBuffer[2] < MAX_NODES && packetBuffer[3] != NODE_ID && packetBuffer[4] != NODE_ID && packetBuffer[5] != NODE_ID) {
+    } else if(PACKETBUFFER[0] == RREQ_PACKET && PACKETBUFFER[1] < 255 && PACKETBUFFER[2] < MAX_NODES && PACKETBUFFER[3] != NODE_ID && PACKETBUFFER[4] != NODE_ID && PACKETBUFFER[5] != NODE_ID) {
       // Receives RREQ Packet and Sends RREP Packet
-      sendAODVPacket(RREP_PACKET, packetBuffer[1], packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID);
-      RoutingTable[packetBuffer[4]] = {1, packetBuffer[2], packetBuffer[5], packetBuffer[4], NODE_ID};
+      SendAODVPacket(RREP_PACKET, PACKETBUFFER[1], PACKETBUFFER[2], PACKETBUFFER[5], PACKETBUFFER[4], NODE_ID);
+      ROUTINGTABLE[PACKETBUFFER[4]] = {1, PACKETBUFFER[2], PACKETBUFFER[5], PACKETBUFFER[4], NODE_ID};
       Serial.println("Received RREQ Packet:");
-      Serial.println("Packet Type:        " + String(packetBuffer[0]));
-      Serial.println("Broadcast Id:       " + String(packetBuffer[1]));
-      Serial.println("Hop Count:          " + String(packetBuffer[2]));    
-      Serial.println("Previous Node:      " + String(packetBuffer[3]));
-      Serial.println("Source Node:        " + String(packetBuffer[4]));
-      Serial.println("Next Node:          " + String(packetBuffer[5]));
+      Serial.println("Packet Type:        " + String(PACKETBUFFER[0]));
+      Serial.println("Broadcast Id:       " + String(PACKETBUFFER[1]));
+      Serial.println("Hop Count:          " + String(PACKETBUFFER[2]));    
+      Serial.println("Previous Node:      " + String(PACKETBUFFER[3]));
+      Serial.println("Source Node:        " + String(PACKETBUFFER[4]));
+      Serial.println("Next Node:          " + String(PACKETBUFFER[5]));
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     }
   }
