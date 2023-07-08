@@ -130,14 +130,19 @@ void Reconnect() {
     } else {
       Serial.print( "[FAILED]" );
       Serial.println( " : retrying in 5 seconds]" );
-      delay( 5000 );
+      delay(5000);
     }
   }
 }
 
 // Uploads Data to ThingsBoard
 void UploadData(uint8_t Node_Id, float Speed, float Latitude, float Longitude, float Pdr) {
-         if(Node_Id == 1) {
+         if(Node_Id == 0) {
+    tb.sendTelemetryFloat("N0 Speed", Speed);
+    tb.sendTelemetryFloat("N0 Latitude", Latitude);
+    tb.sendTelemetryFloat("N0 Longitude", Longitude);
+    tb.sendTelemetryFloat("N0 PDR", Pdr);
+  } else if(Node_Id == 1) {
     tb.sendTelemetryFloat("N1 Speed", Speed);
     tb.sendTelemetryFloat("N1 Latitude", Latitude);
     tb.sendTelemetryFloat("N1 Longitude", Longitude);
@@ -147,11 +152,6 @@ void UploadData(uint8_t Node_Id, float Speed, float Latitude, float Longitude, f
     tb.sendTelemetryFloat("N2 Latitude", Latitude);
     tb.sendTelemetryFloat("N2 Longitude", Longitude);
     tb.sendTelemetryFloat("N2 PDR", Pdr);
-  } else if(Node_Id == 3) {
-    tb.sendTelemetryFloat("N3 Speed", Speed);
-    tb.sendTelemetryFloat("N3 Latitude", Latitude);
-    tb.sendTelemetryFloat("N3 Longitude", Longitude);
-    tb.sendTelemetryFloat("N3 PDR", Pdr);
   }
 }
 
@@ -188,7 +188,7 @@ void setup() {
     Serial.println("Starting Node " + String(NODE_ID) + " Failed.");
     delay(10000);
   }
-  Serial.println("Starting Node " + String(NODE_ID) + " Succeeded");
+  Serial.println("Starting Node " + String(NODE_ID) + " Succeeded.");
 }
 
 void loop() {
@@ -223,6 +223,7 @@ void loop() {
       Serial.println("Packets Received:   " + String(PRECEIVED[PACKETBUFFER[2]]));
       Serial.println("Packets Sent:       " + String(PSENT[PACKETBUFFER[2]]));
       Serial.println("PDR:                " + String(PDR[PACKETBUFFER[2]]));
+      Serial.println("RTT:                " + String(rtt, 10));
       Serial.println("RSSI:               " + String(LoRa.packetRssi()));
     } else if(PACKETBUFFER[0] == RREQ_PACKET && PACKETBUFFER[1] < 255 && PACKETBUFFER[2] < MAX_NODES && PACKETBUFFER[3] != NODE_ID && PACKETBUFFER[4] != NODE_ID && PACKETBUFFER[5] != NODE_ID) {
       // Receives RREQ Packet and Sends RREP Packet

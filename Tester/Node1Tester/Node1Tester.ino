@@ -93,7 +93,7 @@ void SendAODVPacket(uint8_t PacketType, uint8_t BroadcastId, uint8_t HopCount, u
 }
 
 // For Testing
-uint8_t PSENT = 0;
+uint8_t PSENT = 1;
 float TSENT = 0;
 float TRECEIVED = 0;
 float RTTTOTAL = 0;
@@ -125,7 +125,7 @@ void setup() {
 
 void loop() {
   // Transmitter Mode (Lasts Briefly)
-         if(ROUTINGTABLE[NODE_ID].isRouted == 1 && MCU.available() > 0) {
+         if(ROUTINGTABLE[NODE_ID].isRouted == 1) {
     // Updates SPEED, LATITUDE, and LONGITUDE
     if(MCU.available() > 0) {
       GPS.encode(MCU.read());
