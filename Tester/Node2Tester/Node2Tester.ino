@@ -1,5 +1,5 @@
 // Setup Node Information
-#define NODE_ID 1
+#define NODE_ID 2
 #define MAX_NODES 3
 #define DATA_PACKET 0
 #define RREQ_PACKET 1
