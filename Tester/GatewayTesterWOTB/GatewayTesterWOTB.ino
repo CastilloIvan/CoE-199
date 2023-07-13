@@ -180,10 +180,10 @@ void setup() {
   LoRa.setPins(SS, RESET, DIO0);
 
   // Setup WiFi Module
-  InitWiFi();
+  // InitWiFi();
 
   // Setup ThingsBoard Information
-  if(!tb.connected()) { Reconnect(); }
+  // if(!tb.connected()) { Reconnect(); }
 
   // Tests Setup
   Serial.println("Starting Node " + String(NODE_ID) + ".");
@@ -195,7 +195,7 @@ void setup() {
 }
 
 void loop() {
-  if(!tb.connected()) { Reconnect(); }
+  // if(!tb.connected()) { Reconnect(); }
 
   int PACKETSIZE = LoRa.parsePacket();
   if(PACKETSIZE) {
@@ -215,7 +215,7 @@ void loop() {
       PRECEIVED[PACKETBUFFER[2]] += 1;
       PSENT[PACKETBUFFER[2]] = PACKETBUFFER[15];
       PDR[PACKETBUFFER[2]] = PRECEIVED[PACKETBUFFER[2]] / PSENT[PACKETBUFFER[2]];
-      UploadData(PACKETBUFFER[2], speed, latitude, longitude, PDR[PACKETBUFFER[2]], rtt);
+      // UploadData(PACKETBUFFER[2], speed, latitude, longitude, PDR[PACKETBUFFER[2]], rtt);
       Serial.println("Received DATA Packet:");
       Serial.println("Packet Type:        " + String(PACKETBUFFER[0]));
       Serial.println("Intermediate Node:  " + String(PACKETBUFFER[1]));
@@ -243,5 +243,5 @@ void loop() {
     }
   }
 
-  tb.loop();
+  // tb.loop();
 }

@@ -127,11 +127,18 @@ void loop() {
   // Transmitter Mode (Lasts Briefly)
          if(ROUTINGTABLE[NODE_ID].isRouted == 1) {
     // Updates SPEED, LATITUDE, and LONGITUDE
-    if(MCU.available() > 0) {
-      GPS.encode(MCU.read());
-      SPEED = GPS.speed.kmph();
-      LATITUDE = GPS.location.lat();
-      LONGITUDE = GPS.location.lng();
+    long SENDINGTIME = millis();
+    while(true) {
+      if(MCU.available() > 0) {
+        GPS.encode(MCU.read());
+        if(GPS.location.isUpdated()) {
+          SPEED = GPS.speed.kmph();
+          LATITUDE = GPS.location.lat();
+          LONGITUDE = GPS.location.lng();
+          break;
+        }
+      }
+      if(millis() - SENDINGTIME > 2000) { break; } else { continue; }
     }
     // Sends DATA Packet
     SendDATAPacket(DATA_PACKET, NODE_ID, NODE_ID, SPEED, LATITUDE, LONGITUDE, PSENT, RTT);
